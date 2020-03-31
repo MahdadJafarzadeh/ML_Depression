@@ -90,6 +90,7 @@ This is a method to fine tune the hyper parameters of a model. [sometimes] Rando
 ## 5. Others
 ### 5.1. Feat_importance_plot(Input ,labels, n_estimators)
 Plots feature importance for Random Forest model.
+
     INPUTS: 
            Input        : Featureset input
            labels       : Labels (classes)
@@ -97,19 +98,31 @@ Plots feature importance for Random Forest model.
 
 ## Sample code to use methods
 ```ruby
-fname = ("P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/tr90_N3&REM_fp2-M1.h5")
+fname = ("P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/tr90_N3_fp1-M2_fp2-M1.h5")
 ch = 'fp2-M1'
+
 # Defining the object of ML_Depression class
 Object = ML_Depression(fname, ch, fs = 200, T = 30)
 # Extract features
-X,y                  = Object.FeatureExtraction()    
+X,y            = Object.FeatureExtraction()    
 # Cross-validation using SVM
-accuracies_SVM       = Object.KernelSVM_Modelling(X, y, cv = 10, kernel = 'rbf')
+accuracies_SVM = Object.KernelSVM_Modelling(X, y, cv = 10, kernel = 'rbf')
 # Cross-validation using logistic regression
-accuracies_LR        = Object.LogisticRegression_Modelling(X, y, cv = 10)
+accuracies_LR  = Object.LogisticRegression_Modelling(X, y, cv = 10)
 # Cross-validation using logistic Random Forests
-accuracies_RF        = Object.RandomForest_Modelling(X, y, n_estimators = 200, cv = 10)
+accuracies_RF  = Object.RandomForest_Modelling(X, y, n_estimators = 200, cv = 10)
+# Cross-validation using XGBoost
+accuracies_xgb = Object.XGB_Modelling(X, y, n_estimators = 200, cv = 10, 
+                                      max_depth = 3,learning_rate = .1)
 # Applying Randomized grid search to find the best config. of RF
 Object.RandomSearchRF(X,y)
+
+# combining epochs 
+# Combining some REM and SWS epochs
+Object.CombineEpochs(directory = 'P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/',
+              ch = 'fp2-M1', N3_fname  = 'tr90_N3_fp1-M2_fp2-M1',
+              REM_fname = 'tr90_fp1-M2_fp2-M1',
+              saving = False, fname_save = 'tst')
+
 '''
 
