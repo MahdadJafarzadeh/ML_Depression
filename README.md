@@ -55,6 +55,18 @@ A Logistic regression model is made using this function and then a k-fold cross-
     OUTPUTS:
         1) accuracies_LR: Accuracies derived from each fold of cross-validation.
         
+### 2.4. XGB_Modelling( X, y, n_estimators, cv , max_depth, learning_rate):
+A XGBoost model (a set of trees, in series) is made using this function and then a k-fold cross-validation will be used to assess the model classification power.
+    INPUTS: 
+           X              : Featureset input
+           y              : Labels (classes)
+           n_estimators   : # trees
+           cv             : Cross-validation order
+           max_depth      : Maximum number of levels in tree.
+           learning_rate  : the steps taken to learn the data.
+    OUTPUTS:
+        1) accuracies_xgb : Accuracies derived from each fold of cross-validation.
+
 ## 3. Randomized search
 This is a method to fine tune the hyper parameters of a model. [sometimes] Randomized search is preferable to Grid search due to Randomly selecting instances among the parameters list, leading to faster computations.
 
@@ -75,7 +87,15 @@ This is a method to fine tune the hyper parameters of a model. [sometimes] Rando
     OUTPUTS:
         1) BestParams_RandomSearch: using 'best_params_' method.
         2) Bestsocre_RandomSearch : using 'best_score_' method.
-## 4. Sample code to use methods of class
+## 5. Others
+### 5.1. Feat_importance_plot(Input ,labels, n_estimators)
+Plots feature importance for Random Forest model.
+    INPUTS: 
+           Input        : Featureset input
+           labels       : Labels (classes)
+           n_estimators : number of trees in RF
+
+## Sample code to use methods
 ```ruby
 fname = ("P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/tr90_N3&REM_fp2-M1.h5")
 ch = 'fp2-M1'
@@ -92,3 +112,4 @@ accuracies_RF        = Object.RandomForest_Modelling(X, y, n_estimators = 200, c
 # Applying Randomized grid search to find the best config. of RF
 Object.RandomSearchRF(X,y)
 '''
+
