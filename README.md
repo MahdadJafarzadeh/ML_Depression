@@ -75,3 +75,20 @@ This is a method to fine tune the hyper parameters of a model. [sometimes] Rando
     OUTPUTS:
         1) BestParams_RandomSearch: using 'best_params_' method.
         2) Bestsocre_RandomSearch : using 'best_score_' method.
+## 4. Sample code to use methods of class
+```ruby
+fname = ("P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/tr90_N3&REM_fp2-M1.h5")
+ch = 'fp2-M1'
+# Defining the object of ML_Depression class
+Object = ML_Depression(fname, ch, fs = 200, T = 30)
+# Extract features
+X,y                  = Object.FeatureExtraction()    
+# Cross-validation using SVM
+accuracies_SVM       = Object.KernelSVM_Modelling(X, y, cv = 10, kernel = 'rbf')
+# Cross-validation using logistic regression
+accuracies_LR        = Object.LogisticRegression_Modelling(X, y, cv = 10)
+# Cross-validation using logistic Random Forests
+accuracies_RF        = Object.RandomForest_Modelling(X, y, n_estimators = 200, cv = 10)
+# Applying Randomized grid search to find the best config. of RF
+Object.RandomSearchRF(X,y)
+'''
