@@ -20,16 +20,18 @@ from scipy.signal import butter, lfilter, periodogram, spectrogram, welch
 from sklearn.ensemble import RandomForestClassifier
 import heapq
 from scipy.signal import argrelextrema
-from sklearn.model_selection import cross_val_score
-from sklearn.metrics import confusion_matrix
+from sklearn.model_selection import cross_val_score,KFold, cross_validate
+from sklearn.metrics import confusion_matrix, make_scorer, accuracy_score, precision_score, recall_score, f1_score
+from entropy.entropy import spectral_entropy
 import seaborn as sb
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from scipy.stats import kurtosis, skew
-from entropy.entropy import spectral_entropy
 from scipy.fftpack import fft
 import h5py
 import time
+import pyeeg
+import nolds
 
 class ML_Depression():
     
@@ -40,6 +42,63 @@ class ML_Depression():
         self.fs       = fs
         self.T        = T
         
+    #%% Combining epochs    
+    def CombineEpochs(directory = 'P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/',
+                      ch = 'fp2-M1', N3_fname  = 'tr90_N3_fp1-M2_fp2-M1',
+                      REM_fname = 'tr90_fp1-M2_fp2-M1',
+                      saving = False, fname_save = 'tst'):
+        # Initialization 
+        tic       = time.time() 
+        # Defining the directory of saved files
+        directory = directory 
+        # Define channel of interest (currently fp1-M2 and fp2-M1 are only active)
+        ch = ch
+        # N3 epochs Filename 
+        N3_fname  = N3_fname
+        # REM epochs Filename
+        REM_fname = REM_fname
+        
+        # Reading N3 epochs
+        with h5py.File(directory + N3_fname + '.h5', 'r') as rf:
+            xtest_N3  = rf['.']['x_test_' + ch].value
+            xtrain_N3 = rf['.']['x_train_' + ch].value
+            ytest_N3  = rf['.']['y_test_' + ch].value
+            ytrain_N3 = rf['.']['y_train_' + ch].value
+        print(f'N3 epochs were loaded successfully in {time.time()-tic} secs')    
+        
+        # Reading REM epochs
+        tic       = time.time() 
+        with h5py.File(directory + REM_fname + '.h5', 'r') as rf:
+            xtest_REM  = rf['.']['x_test_' + ch].value
+            xtrain_REM = rf['.']['x_train_' + ch].value
+            ytest_REM  = rf['.']['y_test_' + ch].value
+            ytrain_REM = rf['.']['y_train_' + ch].value
+        print(f'REM epochs were loaded successfully in {time.time()-tic} secs') 
+           
+        # Combining epochs
+        xtest   = np.row_stack((xtest_N3, xtest_REM))
+        xtrain  = np.row_stack((xtrain_N3, xtrain_REM))
+        ytest   = np.row_stack((ytest_N3, ytest_REM))
+        ytrain  = np.row_stack((ytrain_N3, ytrain_REM))
+        print('Epochs were successfully concatenated')
+        
+        # Save concatenated results:
+        # SAVE train/test splits
+        if saving == True:
+            tic = time.time()
+            fname_save = fname_save
+            with h5py.File((directory+fname_save + '.h5'), 'w') as wf:
+                dset = wf.create_dataset('y_test_' +ch, ytest.shape, data=ytest)
+                dset = wf.create_dataset('y_train_'+ch, ytrain.shape, data=ytrain)
+                dset = wf.create_dataset('x_test_' +ch, xtest.shape, data=xtest)
+                dset = wf.create_dataset('x_train_'+ch, xtrain.shape, data=xtrain)
+            print('Time to save H5: {}'.format(time.time()-tic))
+            return xtrain, ytrain, xtest, ytest
+        else:
+            print('Outputs were generated but not saved')
+            return xtrain, ytrain, xtest, ytest
+
+    #%% Feature extarction
     def FeatureExtraction(self):
         
         ''' ~~~~~~################## INSTRUCTION #################~~~~~~~~
@@ -268,7 +327,19 @@ class ML_Depression():
             Spectral_mean = 1 / (freq_ix['Beta'][-1] - freq_ix['Delta'][0]) * (Pow_Delta + 
                     Pow_Theta_low + Pow_Theta_high + Pow_Alpha + Pow_Beta + 
                     Pow_Sigma) 
-           
+            
+            ''' Correlation Dimension Feature '''
+           # cdf = nolds.corr_dim(data,1)
+            
+            ''' Detrended Fluctuation Analysis ''' 
+            #dfa = pyeeg.dfa(data)
+            
+            ''' Hurst Exponent Feature ''' 
+            #hurst = pyeeg.hurst(data)
+
+            ''' Petrosian Fractal Dimension ''' 
+           # pfd = pyeeg.pfd(data)
+            
             ''' Wrapping up featureset '''
             feat = [pow_total, Pow_Delta, Pow_Theta_low, Pow_Theta_high, Pow_Alpha,
                     Pow_Beta, Pow_Sigma, Pow_Sigma_slow, cA_mean[0], cA_std[0],
@@ -314,48 +385,93 @@ class ML_Depression():
     
     ######################## DEFINING SUPERVISED CLASSIFIERs ######################
     #%% Random Forest
-    def RandomForest_Modelling(self, X, y, n_estimators = 500, cv = 10):
+    def RandomForest_Modelling(self, X, y, scoring, n_estimators = 500, cv = 10):
         tic = time.time()
         classifier_RF = RandomForestClassifier(n_estimators = n_estimators)
-        accuracies_RF = cross_val_score(estimator = classifier_RF, X = X, 
-                                 y = y, cv = cv)
-        Acc_cv10_RF = accuracies_RF.mean()
-        std_cv10_RF = accuracies_RF.std()
-        print(f'Cross validation finished: Mean Accuracy {Acc_cv10_RF} +- {std_cv10_RF}')
-        print('Cross validation took: {} secs'.format(time.time()-tic))
-        return accuracies_RF
+        results_RF = cross_validate(estimator = classifier_RF, X = X, 
+                                 y = y, scoring = scoring, cv = KFold(n_splits = cv))
+        #Acc_cv10_RF = accuracies_RF.mean()
+        #std_cv10_RF = accuracies_RF.std()
+        #print(f'Cross validation finished: Mean Accuracy {Acc_cv10_RF} +- {std_cv10_RF}')
+        print('Cross validation for RF took: {} secs'.format(time.time()-tic))
+        return results_RF
     
     #%% Kernel SVM
-    def KernelSVM_Modelling(self, X, y, cv, kernel):
+    def KernelSVM_Modelling(self, X, y, cv, scoring, kernel):
         tic = time.time()
         from sklearn.svm import SVC
         classifier_SVM = SVC(kernel = kernel)
-        accuracies_SVM = cross_val_score(estimator = classifier_SVM, X = X, 
-                                 y = y, cv = cv)
-        Acc_cv10_SVM = accuracies_SVM.mean()
-        std_cv10_SVM = accuracies_SVM.std()
-        print(f'Cross validation finished: Mean Accuracy {Acc_cv10_SVM} +- {std_cv10_SVM}')
-        print('Cross validation took: {} secs'.format(time.time()-tic))
-        return accuracies_SVM
+        results_SVM = cross_validate(estimator = classifier_SVM, X = X, 
+                                 y = y, scoring = scoring, cv = KFold(n_splits = cv))
+        #Acc_cv10_SVM = accuracies_SVM.mean()
+        #std_cv10_SVM = accuracies_SVM.std()
+        #print(f'Cross validation finished: Mean Accuracy {Acc_cv10_SVM} +- {std_cv10_SVM}')
+        print('Cross validation for SVM took: {} secs'.format(time.time()-tic))
+        return results_SVM
     
     
     #%% Logistic regression
-    def LogisticRegression_Modelling(self, X, y, cv = 10, max_iter = 500):
+    def LogisticRegression_Modelling(self, X, y, scoring, cv = 10, max_iter = 500):
         tic = time.time()
         from sklearn.linear_model import LogisticRegression
         classifier_LR = LogisticRegression(max_iter = max_iter)
-        accuracies_LR = cross_val_score(estimator = classifier_LR, X = X, 
-                                 y = y, cv = cv)
-        Acc_cv10_LR = accuracies_LR.mean()
-        std_cv10_LR = accuracies_LR.std()
-        print(f'Cross validation finished: Mean Accuracy {Acc_cv10_LR} +- {std_cv10_LR}')
-        print('Cross validation took: {} secs'.format(time.time()-tic))
-        return accuracies_LR
+        results_LR = cross_validate(estimator = classifier_LR, X = X, 
+                                 y = y, scoring = scoring, cv = KFold(n_splits = cv))
+        #Acc_cv10_LR = accuracies_LR.mean()
+        #std_cv10_LR = accuracies_LR.std()
+        #print(f'Cross validation finished: Mean Accuracy {Acc_cv10_LR} +- {std_cv10_LR}')
+        print('Cross validation for LR took: {} secs'.format(time.time()-tic))
+        return results_LR
+    #%% XGBoost
+    def XGB_Modelling(self, X, y, scoring, n_estimators = 250, 
+                      cv = 10 , max_depth=3, learning_rate=.1):
+        tic = time.time()
+        from xgboost import XGBClassifier
+        classifier_xgb = XGBClassifier(n_estimators = n_estimators, max_depth = max_depth,
+                                       learning_rate = learning_rate)
+        results_xgb = cross_validate(estimator = classifier_xgb, X = X, 
+                                 y = y, scoring = scoring, cv = KFold(n_splits = cv))
+        #Acc_cv10_xgb = accuracies_xgb.mean()
+        #std_cv10_xgb = accuracies_xgb.std()
+        #print(f'Cross validation finished: Mean Accuracy {Acc_cv10_xgb} +- {std_cv10_xgb}')
+        print('Cross validation for xgb took: {} secs'.format(time.time()-tic))
+        return results_xgb
+    
+    #%% ANN
+    def ANN_Modelling(X, y, units_h1,  input_dim, units_h2, units_output,
+                  init = 'uniform', activation = 'relu', optimizer = 'adam',
+                  loss = 'binary_crossentropy', metrics = ['accuracy'],
+                  h3_status = 'deactive', units_h3 = 50):
+        # Importing the Keras libraries and packages
+        import keras
+        from keras.models import Sequential
+        from keras.layers import Dense
+        
+        # Initialising the ANN
+        classifier = Sequential()
+        
+        # Adding the input layer and the first hidden layer
+        classifier.add(Dense(units = units_h1, init = init, activation = activation, input_dim = input_dim))
+        
+        # Adding the second hidden layer
+        classifier.add(Dense(units = units_h2 , init = init, activation = activation))
+        
+        # Adding the third hidden layer
+        if h3_status == 'active':
+            classifier.add(Dense(units = units_h3 , init = init, activation = activation))
+            
+        # Adding the output layer
+        classifier.add(Dense(units = units_output, init = init, activation = 'sigmoid'))
+        
+        # Compiling the ANN
+        classifier.compile(optimizer = optimizer, loss = loss , metrics = metrics)
+        
+        return classifier
 
     #%% Randomized and grid search 
     ######################## DEFINING RANDOMIZED SEARCH ###########################
     #       ~~~~~~!!!!! THIS IS FOR RANDOM FOREST AT THE MOMENT ~~~~~~!!!!!!
-    def RandomSearchRF(self, X,y, estimator = RandomForestClassifier(),
+    def RandomSearchRF(self, X, y, scoring, estimator = RandomForestClassifier(),
                         n_estimators = [int(x) for x in np.arange(10, 500, 20)],
                         max_features = ['log2', 'sqrt'],
                         max_depth = [int(x) for x in np.arange(10, 100, 30)],
@@ -391,7 +507,7 @@ class ML_Depression():
         
         rf_random = RandomizedSearchCV(estimator = estimator,
                                    param_distributions = param_grid,
-                                   n_iter = n_iter, cv = cv,
+                                   n_iter = n_iter, cv = cv, scoring = scoring,
                                    verbose=2, n_jobs = -1)
         
         grid_result = rf_random.fit(X, y)
@@ -409,6 +525,8 @@ class ML_Depression():
             print("%f (%f) with: %r" % (mean, stdev, param))
         print('Randomized search was done in: {} secs'.format(time.time()-tic))
         print("Best: %f using %s" % (Bestsocre_RandomSearch, BestParams_RandomSearch))
+        
+        return BestParams_RandomSearch, Bestsocre_RandomSearch ,means, stds, params
         #%% Plot feature importance
         
         def Feat_importance_plot(self, Input ,labels, n_estimators = 250):
@@ -419,21 +537,65 @@ class ML_Depression():
             plt.show()
                 
 #%% Test Section:
-fname = ('C:/Users/mahda/Documents/Python Machine Learning/MachineLearning/' +
-             'Machine Learning A-Z Template Folder/Part 8 - Deep Learning/'+
-             'Section 40 - Convolutional Neural Networks (CNN)/CNN_1D/tr80_fp1fp2.h5')
-ch = 'fp2'
+fname = ("P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/tr90_N3_fp1-M2_fp2-M1.h5")
+ch = 'fp2-M1'
 # Defining the object of ML_Depression class
 Object = ML_Depression(fname, ch, fs = 200, T = 30)
 # Extract features
-X,y                  = Object.FeatureExtraction()    
+X,y            = Object.FeatureExtraction() 
+# Define the scoring criteria:
+scoring = {'accuracy' : make_scorer(accuracy_score), 
+           'precision' : make_scorer(precision_score),
+           'recall' : make_scorer(recall_score), 
+           'f1_score' : make_scorer(f1_score)}   
 # Cross-validation using SVM
-accuracies_SVM       = Object.KernelSVM_Modelling(X, y, cv = 10, kernel = 'rbf')
+results_SVM = Object.KernelSVM_Modelling(X, y, scoring = scoring, cv = 10, kernel = 'rbf')
 # Cross-validation using logistic regression
-accuracies_LR        = Object.LogisticRegression_Modelling(X, y, cv = 10)
+results_LR  = Object.LogisticRegression_Modelling(X, y, scoring = scoring, cv = 10)
 # Cross-validation using logistic Random Forests
-accuracies_RF        = Object.RandomForest_Modelling(X, y, n_estimators = 200, cv = 10)
+results_RF  = Object.RandomForest_Modelling(X, y, scoring = scoring, n_estimators = 200, cv = 10)
+# Cross-validation using XGBoost
+results_xgb = Object.XGB_Modelling(X, y, n_estimators = 250, cv = 10, 
+                                      max_depth = 3,learning_rate = .1,
+                                      scoring = scoring)
+
 # Applying Randomized grid search to find the best config. of RF
-Object.RandomSearchRF(X,y)
+BestParams_RandomSearch, Bestsocre_RandomSearch ,means, stds, params= Object.RandomSearchRF(X, y,
+                        estimator = RandomForestClassifier(), scoring = scoring,
+                        n_estimators = [int(x) for x in np.arange(10, 500, 20)],
+                        max_features = ['log2', 'sqrt'],
+                        max_depth = [int(x) for x in np.arange(10, 100, 30)],
+                        min_samples_split = [2, 5, 10],
+                        min_samples_leaf = [1, 2, 4],
+                        bootstrap = [True, False],
+                        n_iter = 100, cv = 10)
+# Combining some REM and SWS epochs
+Object.CombineEpochs(directory = 'P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/',
+              ch = 'fp2-M1', N3_fname  = 'tr90_N3_fp1-M2_fp2-M1',
+              REM_fname = 'tr90_fp1-M2_fp2-M1',
+              saving = False, fname_save = 'tst')
 
-
+# How to save some results?
+directory = 'P:/3013080.02/ml_project/scripts/1D_TimeSeries/results/' 
+fname = '42feats_N3'
+with h5py.File((directory+fname + '.h5'), 'w') as wf:
+                # Accuracies
+                dset = wf.create_dataset('acc_SVM', results_SVM['test_accuracy'].shape, data = results_SVM['test_accuracy'])
+                dset = wf.create_dataset('acc_LR' , results_LR['test_accuracy'].shape, data  = results_LR['test_accuracy'])
+                dset = wf.create_dataset('acc_RF' , results_RF['test_accuracy'].shape, data  = results_RF['test_accuracy'])
+                dset = wf.create_dataset('acc_xgb', results_xgb['test_accuracy'].shape, data = results_xgb['test_accuracy'])
+                # Precision
+                dset = wf.create_dataset('prec_SVM', results_SVM['test_precision'].shape, data = results_SVM['test_precision'])
+                dset = wf.create_dataset('prec_LR' , results_LR['test_precision'].shape, data  = results_LR['test_precision'])
+                dset = wf.create_dataset('prec_RF' , results_RF['test_precision'].shape, data  = results_RF['test_precision'])
+                dset = wf.create_dataset('prec_xgb', results_xgb['test_precision'].shape, data = results_xgb['test_precision'])
+                # Recall
+                dset = wf.create_dataset('rec_SVM', results_SVM['test_recall'].shape, data = results_SVM['test_recall'])
+                dset = wf.create_dataset('rec_LR' , results_LR['test_recall'].shape, data  = results_LR['test_recall'])
+                dset = wf.create_dataset('rec_RF' , results_RF['test_recall'].shape, data  = results_RF['test_recall'])
+                dset = wf.create_dataset('rec_xgb', results_xgb['test_recall'].shape, data = results_xgb['test_recall'])
+                # f1-score
+                dset = wf.create_dataset('f1_SVM', results_SVM['test_f1_score'].shape, data = results_SVM['test_f1_score'])
+                dset = wf.create_dataset('f1_LR' , results_LR['test_f1_score'].shape, data  = results_LR['test_f1_score'])
+                dset = wf.create_dataset('f1_RF' , results_RF['test_f1_score'].shape, data  = results_RF['test_f1_score'])
+                dset = wf.create_dataset('f1_xgb', results_xgb['test_f1_score'].shape, data = results_xgb['test_f1_score'])
