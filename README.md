@@ -19,47 +19,51 @@ This is the main method to extract features and then use the following methods o
 
 ## 2. Classifiers      
         
-### 2.1. RandomForest_Modelling( X, y, n_estimators, cv)
+### 2.1. RandomForest_Modelling( X, y, scoring, n_estimators, cv)
 A random forest classifier is made using this function and then a k-fold cross-validation will be used to assess the model classification power.
 
     INPUTS: 
            X            : Featureset input
            y            : Labels (classes)
+           scoring      : scoring criteria, e.g. 'accuracy', 'f1_score' etc.
            n_estimator  : number of trees for Random Forest classifier.
            cv           : Cross-validation order
         
     OUTPUTS:
-        1) accuracies_RF: Accuracies derived from each fold of cross-validation.
+           1) accuracies_RF: Accuracies derived from each fold of cross-validation.
         
-### 2.2. KernelSVM_Modelling(X, y, cv, kernel)
+### 2.2. KernelSVM_Modelling(X, y, scoring, cv, kernel)
 
 A non-linear SVM model is made using this function and then a k-fold cross-validation will be used to assess the model classification power.
 
     INPUTS: 
            X            : Featureset input
            y            : Labels (classes)
+           scoring      : scoring criteria, e.g. 'accuracy', 'f1_score' etc.
            kernel       : kernel function of SVM (e.g. 'db10').
            cv           : Cross-validation order
         
     OUTPUTS:
         1) accuracies_SVM: Accuracies derived from each fold of cross-validation.
-### 2.3. LogisticRegression_Modelling(X, y, cv, max_iter)
+### 2.3. LogisticRegression_Modelling(X, y, scroing, cv, max_iter)
 A Logistic regression model is made using this function and then a k-fold cross-validation will be used to assess the model classification power.
 
     INPUTS: 
            X            : Featureset input
            y            : Labels (classes)
+           scoring      : scoring criteria, e.g. 'accuracy', 'f1_score' etc.
            max_iter     : Maximum number of iterations during training.
            cv           : Cross-validation order
         
     OUTPUTS:
         1) accuracies_LR: Accuracies derived from each fold of cross-validation.
         
-### 2.4. XGB_Modelling( X, y, n_estimators, cv , max_depth, learning_rate):
+### 2.4. XGB_Modelling( X, y, scoring, n_estimators, cv , max_depth, learning_rate):
 A XGBoost model (a set of trees, in series) is made using this function and then a k-fold cross-validation will be used to assess the model classification power.
     INPUTS: 
            X              : Featureset input
            y              : Labels (classes)
+           scoring        : scoring criteria, e.g. 'accuracy', 'f1_score' etc.
            n_estimators   : # trees
            cv             : Cross-validation order
            max_depth      : Maximum number of levels in tree.
@@ -70,11 +74,12 @@ A XGBoost model (a set of trees, in series) is made using this function and then
 ## 3. Randomized search
 This is a method to fine tune the hyper parameters of a model. [sometimes] Randomized search is preferable to Grid search due to Randomly selecting instances among the parameters list, leading to faster computations.
 
-### 3.1. RandomSearchRF(X,y, estimator, n_estimators, max_features, max_depth, min_samples_split, min_samples_leaf,bootstrap,n_iter):
+### 3.1. RandomSearchRF(X,y, scoring, estimator, n_estimators, max_features, max_depth, min_samples_split, min_samples_leaf,bootstrap,n_iter):
 
     INPUTS: 
            X                : Featureset input
            y                : Labels (classes)
+           scoring          : scoring criteria, e.g. 'accuracy', 'f1_score' etc.
            estimator        : RF estimator
            n_estimators     : a list comprising number of trees to investigate.
            max_features     : Number of features to consider at every split.
@@ -85,10 +90,64 @@ This is a method to fine tune the hyper parameters of a model. [sometimes] Rando
            n_iter           : The amount of randomly selecting a set of aforementioned parameters.
         
     OUTPUTS:
-        1) BestParams_RandomSearch: using 'best_params_' method.
-        2) Bestsocre_RandomSearch : using 'best_score_' method.
-## 5. Others
-### 5.1. Feat_importance_plot(Input ,labels, n_estimators)
+          1) BestParams_RandomSearch: using 'best_params_' method.
+          2) Bestsocre_RandomSearch : using 'best_score_' method.
+          
+## 4. Feature Selection Methods
+Different methods to select the extracted features can be found under this category. There are some filter methods (statistical) in which you need to specify how many features are you willing to select. On the other hand, there are some wrapper (machine-learning-based) methods in which they create ML models themseleves and then select the most represantative features, so there is no need to specify how many features to be selected.
+
+### 4.1. FeatSelect_Boruta(X,y, max_depth):
+Boruta method of feature selection. The method creates a random forest / decision tree model and check classification outcomes using different subsets of input features to come up with the most represantative set of features.
+
+    INPUTS: 
+           X                : Featureset input
+           y                : Labels (classes)
+    
+    OUTPUTS:
+           ranks            : ranking of features
+           Feat_selected    : new "X" after choosing the most discriminative features.
+           
+### 4.2. FeatSelect_LASSO(X, y, C)
+
+    INPUTS: 
+           X                : Featureset input
+           y                : Labels (classes)
+           C                : Penalization factor
+    
+    OUTPUTS:
+           Feat_selected    : new "X" after choosing the most discriminative features.
+           
+### 4.3. FeatSelect_ANOVA(X, y, k) 
+
+    INPUTS: 
+           X                : Featureset input
+           y                : Labels (classes)
+           k                : number of required features to be selected.
+           
+    OUTPUTS:
+           Feat_selected    : new "X" after choosing the most discriminative features.
+           
+### 4.4. FeatSelect_Recrusive(X,y,k)
+           
+    INPUTS: 
+           X                : Featureset input
+           y                : Labels (classes)
+           k                : number of required features to be selected.
+           
+    OUTPUTS:
+           Feat_selected    : new "X" after choosing the most discriminative features.
+
+### 4.5. FeatSelect_PCA(X, y, n_components)
+
+    INPUTS: 
+           X                : Featureset input
+           y                : Labels (classes)
+           n_components     : number of required principal components.
+           
+    OUTPUTS:
+           Feat_selected    : new "X" after choosing the most discriminative features.
+           
+### 4.6. Feat_importance_plot(Input ,labels, n_estimators)
 Plots feature importance for Random Forest model.
 
     INPUTS: 
@@ -96,33 +155,37 @@ Plots feature importance for Random Forest model.
            labels       : Labels (classes)
            n_estimators : number of trees in RF
 
+           
+## 5. Others:
+This category belong to other methods of the ML_Depression class.
+
+### 5.1. SaveFeatureSet(X, y, path, filename)
+This method is to save the extracted featrues.
+
+    INPUTS: 
+           X            : Featureset input
+           y            : Labels (classes)
+           path         : Location to save (final FOLDER)
+           filename     : FILENAME to save in "path"
+           cv           : Cross-validation order
+           
+### 5.2. LoadFeatureSet( path, fname, feats, labels)  
+
+    INPUTS: 
+           path         : Location to save (final FOLDER)
+           fname        : FILENAME to save in "path"
+           feats        : Featureset input 
+           labels       : Labels (classes)
+           
+### 5.3. CombineEpochs(directory, ch, N3_fname, REM_fname , saving = False, fname_save)
+This funcyion can combine different stages together. The main interest was to combine SWS (N3) and REM stages for classification.
+
+    INPUTS: 
+           directrory   : Location to load files (final FOLDER)
+           N3_fname     : FILENAME of N3 stages (.h5 file)
+           REM_fname    : FILENAME of REM stages (.h5 file)
+           saving       : to save results: True
+           fname_save   : name of file to save results
+           
 ## Sample code to use methods
-```ruby
-fname = ("P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/tr90_N3_fp1-M2_fp2-M1.h5")
-ch = 'fp2-M1'
-
-# Defining the object of ML_Depression class
-Object = ML_Depression(fname, ch, fs = 200, T = 30)
-# Extract features
-X,y            = Object.FeatureExtraction()    
-# Cross-validation using SVM
-accuracies_SVM = Object.KernelSVM_Modelling(X, y, cv = 10, kernel = 'rbf')
-# Cross-validation using logistic regression
-accuracies_LR  = Object.LogisticRegression_Modelling(X, y, cv = 10)
-# Cross-validation using logistic Random Forests
-accuracies_RF  = Object.RandomForest_Modelling(X, y, n_estimators = 200, cv = 10)
-# Cross-validation using XGBoost
-accuracies_xgb = Object.XGB_Modelling(X, y, n_estimators = 200, cv = 10, 
-                                      max_depth = 3,learning_rate = .1)
-# Applying Randomized grid search to find the best config. of RF
-Object.RandomSearchRF(X,y)
-
-# combining epochs 
-# Combining some REM and SWS epochs
-Object.CombineEpochs(directory = 'P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/',
-              ch = 'fp2-M1', N3_fname  = 'tr90_N3_fp1-M2_fp2-M1',
-              REM_fname = 'tr90_fp1-M2_fp2-M1',
-              saving = False, fname_save = 'tst')
-
-'''
-
+to see examples of using code, see example folder.
