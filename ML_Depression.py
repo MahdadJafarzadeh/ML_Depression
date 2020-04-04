@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on 29/03/2020 
-@author: Mahdad
+@author: Mahdad 
 
 THIS IS THE CLASS FOR "MACHINE LEARNING & DEPRESSION PROJECT."
 The class is capable of extracting relevant features, applying various machine-
@@ -14,7 +14,7 @@ relevant input/outputs.
 """
 #%% Importing libs
 import numpy as np
-import pandas as pd
+import pandas as pd 
 import pywt
 from scipy.signal import butter, lfilter, periodogram, spectrogram, welch
 from sklearn.ensemble import RandomForestClassifier
@@ -42,8 +42,16 @@ class ML_Depression():
         self.fs       = fs
         self.T        = T
         
-    #%% Combining epochs    
-    def CombineEpochs(directory = 'P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/',
+    #%% Loading existing featureset
+    def LoadFeatureSet(self, path, fname, feats, labels):
+        # Reading N3 epochs
+        with h5py.File(path + fname + '.h5', 'r') as rf:
+            X  = rf['.'][feats].value
+            y  = rf['.'][labels].value
+        return X, y
+    
+    #%% Combining epochs
+    def CombineEpochs(self, directory = 'P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/',
                       ch = 'fp2-M1', N3_fname  = 'tr90_N3_fp1-M2_fp2-M1',
                       REM_fname = 'tr90_fp1-M2_fp2-M1',
                       saving = False, fname_save = 'tst'):
@@ -329,17 +337,10 @@ class ML_Depression():
                     Pow_Sigma) 
             
             ''' Correlation Dimension Feature '''
-           # cdf = nolds.corr_dim(data,1)
+            #cdf = nolds.corr_dim(data,1)
             
             ''' Detrended Fluctuation Analysis ''' 
-            #dfa = pyeeg.dfa(data)
-            
-            ''' Hurst Exponent Feature ''' 
-            #hurst = pyeeg.hurst(data)
 
-            ''' Petrosian Fractal Dimension ''' 
-           # pfd = pyeeg.pfd(data)
-            
             ''' Wrapping up featureset '''
             feat = [pow_total, Pow_Delta, Pow_Theta_low, Pow_Theta_high, Pow_Alpha,
                     Pow_Beta, Pow_Sigma, Pow_Sigma_slow, cA_mean[0], cA_std[0],
@@ -383,7 +384,103 @@ class ML_Depression():
         
         return X, y
     
+    #%% Save features
+    
+    def SaveFeatureSet(self, X, y, path, filename):
+        path     = path  
+        filename = filename
+        with h5py.File((path+filename + '.h5'), 'w') as wf:
+            dset = wf.create_dataset('featureset', X.shape, data = X)
+            dset = wf.create_dataset('labels', y.shape, data = y)
+        print('Features have been successfully saved!')
+
+        ######################## DEFINING FEATURE SELECTION METHODS ######################
+    #%% Feature selection section - 1. Boruta method
+    def FeatSelect_Boruta(self, X,y,max_depth = 7):
+        #import lib
+        tic = time.time()
+        from boruta import BorutaPy
+        #instantiate an estimator for Boruta. 
+        rf = RandomForestClassifier(n_jobs=-1, class_weight=None, max_depth=max_depth)
+        # Initiate Boruta object
+        feat_selector = BorutaPy(rf, n_estimators='auto', verbose=2, random_state=0)
+        # fir the object
+        feat_selector.fit(X=X, y=y)
+        # Check selected features
+        print(feat_selector.support_)
+        # Select the chosen features from our dataframe.
+        Feat_selected = X[:, feat_selector.support_]
+        print(f'Selected Feature Matrix Shape {Feat_selected.shape}')
+        toc = time.time()
+        print(f'Feature selection using Boruta took {toc-tic}')
+        ranks = feat_selector.ranking_
+        
+        return ranks, Feat_selected
+    
+    #%% Feature selection using LASSO as regression penalty
+    def FeatSelect_LASSO(self, X, y, C = 1):
+        from sklearn.linear_model import LogisticRegression
+        tic = time.time()
+        from sklearn.linear_model import Lasso
+        from sklearn.feature_selection import SelectFromModel
+        #create object
+        sel_ = SelectFromModel(LogisticRegression(C=C, penalty='l1'))
+        sel_.fit(X, y)
+        # find the selected feature indices
+        selected_ = sel_.get_support()
+        # Select releavnt features
+        Feat_selected = X[:, selected_]
+        toc = time.time()
+        print(f'Total time for LASSO feature selection was: {toc-tic}')
+        print(f'total of {len(Feat_selected)} was selected out of {np.shape(X)[1]} features')
+        return Feat_selected
+    
+    #%% Feature Selection with Univariate Statistical Tests
+    def FeatSelect_ANOVA(self, X, y, k=20):
+        tic = time.time()
+        from sklearn.feature_selection import SelectKBest, f_classif
+        test = SelectKBest(score_func=f_classif, k=k)
+        fit = test.fit(X, y)
+        # summarize scores
+        print(f' scores: {fit.scores_}')
+        Feat_selected = fit.transform(X)
+        toc = time.time()
+        print(f'Total time for ANOVA feature selection was: {toc-tic}')
+
+        return Feat_selected
+    #%% # Recursive Feature Elimination
+    def FeatSelect_Recrusive(self, X,y, k = 20):
+        from sklearn.feature_selection import RFE
+        from sklearn.linear_model import LogisticRegression
+            # feature extraction
+        model = LogisticRegression(solver='lbfgs')
+        rfe = RFE(model, n_features_to_select = k)
+        fit = rfe.fit(X, y)
+        ranks = fit.ranking_
+        selected_ = fit.support_
+        Feat_selected = X[:, selected_]
+        print("Num Features: %d" % fit.n_features_)
+        print("Selected Features: %s" % fit.support_)
+        print("Feature Ranking: %s" % fit.ranking_)
+        
+        return ranks, Feat_selected
+
+    #%% PCA
+    def FeatSelect_PCA(self, X, y, n_components = 5):
+        tic = time.time()
+        from sklearn.decomposition import PCA
+        pca = PCA(n_components=n_components)
+        PCA_out = pca.fit(X)
+        # summarize components
+        print("Explained Variance: %s" % PCA_out.explained_variance_ratio_)
+        print(PCA_out.components_)
+        toc = time.time()
+        print(f'Total time for PCA feature selection was: {toc-tic}')
+
+        return PCA_out
+    
     ######################## DEFINING SUPERVISED CLASSIFIERs ######################
+    
     #%% Random Forest
     def RandomForest_Modelling(self, X, y, scoring, n_estimators = 500, cv = 10):
         tic = time.time()
@@ -438,7 +535,7 @@ class ML_Depression():
         return results_xgb
     
     #%% ANN
-    def ANN_Modelling(X, y, units_h1,  input_dim, units_h2, units_output,
+    def ANN_Modelling(self, X, y, units_h1,  input_dim, units_h2, units_output,
                   init = 'uniform', activation = 'relu', optimizer = 'adam',
                   loss = 'binary_crossentropy', metrics = ['accuracy'],
                   h3_status = 'deactive', units_h3 = 50):
@@ -535,14 +632,57 @@ class ML_Depression():
             FeatureImportance = pd.Series(classifier.feature_importances_).sort_values(ascending=False)
             sb.barplot(y=FeatureImportance, x=FeatureImportance.index)
             plt.show()
+            
+        #%% mix pickle and h5 features
+        def mix_pickle_h5(self, picklefile, saving_fname,
+                          h5file = ("P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/tr90_N3_fp1-M2_fp2-M1.h5"),
+                          saving = False, ch = 'fp2-M1'):
+            import pickle 
+    
+            # Define pickle file name
+            
+            picklefile = picklefile
+            pickle_in = open(picklefile + ".pickle","rb")
+            Featureset = pickle.load(pickle_in)
+            # Open relative h5 file to map labels
+            fname = h5file # N3
+            ch = ch
+            with h5py.File(fname, 'r') as rf:
+                xtest  = rf['.']['x_test_' + ch].value
+                xtrain = rf['.']['x_train_' + ch].value
+                ytest  = rf['.']['y_test_' + ch].value
+                ytrain = rf['.']['y_train_' + ch].value
+            
+            y = np.concatenate((ytrain[:,1], ytest[:,1]))
+            
+            rp = np.random.permutation(len(y))
+            
+            X = Featureset[rp,:]
+            y = y[rp]
+            
+            # saving
+            if saving == True:
+                directory = 'P:/3013080.02/ml_project/scripts/1D_TimeSeries/features/' 
+                fname = saving_fname
+                with h5py.File((directory+fname + '.h5'), 'w') as wf:
+                    # Accuracies
+                    dset = wf.create_dataset('X', X.shape, data =X)
+                    dset = wf.create_dataset('y' , y.shape, data  = y)
+                    
+            return X, y
                 
-#%% Test Section:
-fname = ("P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/tr90_N3_fp1-M2_fp2-M1.h5")
+#%% Test Section: Choose the file of interest
+fname = ("P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/tr90_N3_fp1-M2_fp2-M1.h5") # N3
+#fname = ("P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/tr90_fp1-M2_fp2-M1.h5")   # REM
+#fname = ("P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/tr90_N3&REM_fp2-M1.h5") # N3 & REM --> Fp2-M1
+#fname = ("P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/tr90_N3&REM_fp1-M2.h5") # N3 & REM --> Fp1-M2
 ch = 'fp2-M1'
 # Defining the object of ML_Depression class
 Object = ML_Depression(fname, ch, fs = 200, T = 30)
 # Extract features
 X,y            = Object.FeatureExtraction() 
+#Feature Selection
+#ranks, Feat_selected = Object.FeatSelect_Boruta(X, y, max_depth = 7)
 # Define the scoring criteria:
 scoring = {'accuracy' : make_scorer(accuracy_score), 
            'precision' : make_scorer(precision_score),
@@ -558,8 +698,41 @@ results_RF  = Object.RandomForest_Modelling(X, y, scoring = scoring, n_estimator
 results_xgb = Object.XGB_Modelling(X, y, n_estimators = 250, cv = 10, 
                                       max_depth = 3,learning_rate = .1,
                                       scoring = scoring)
+# Cross-validation using ANN
+from keras.wrappers.scikit_learn import KerasClassifier
+tic = time.time() 
+create_model = Object.ANN_Modelling(X, y, units_h1=22,  input_dim=42, units_h2=11, units_output=1,
+                  init = 'uniform', activation = 'relu', optimizer = 'adam',
+                  loss = 'binary_crossentropy', metrics = ['accuracy'],
+                  h3_status = 'deactive', units_h3 = 50)
+model = KerasClassifier(build_fn=create_model, epochs=15, batch_size=10, verbose=1)
+# evaluate using 10-fold cross validation
+results_ANN = cross_validate(model, X, y, cv=10)
 
-# Applying Randomized grid search to find the best config. of RF
+print('Taken time : {} secs'.format(time.time()-tic))
+
+#%% Outcome measures
+# Defien required metrics here:
+Metrics = ['test_accuracy', 'test_precision', 'test_recall', 'test_f1_score']
+for metric in Metrics:
+    #RF
+    r1      = results_RF[metric].mean()
+    std1    = results_RF[metric].std()
+    print(f'{metric} for RF is: {round(r1*100, 2)}+- {round(std1*100, 2)}')
+    # xgb
+    r2      = results_xgb[metric].mean()
+    std2    = results_xgb[metric].std()
+    print(f'{metric} for xgb is: {round(r2*100, 2)}+- {round(std2*100, 2)}')
+    # SVM
+    r3      = results_SVM[metric].mean()
+    std3    = results_SVM[metric].std()
+    print(f'{metric} for SVM is: {round(r3*100, 2)}+- {round(std3*100, 2)}')
+    # LR
+    r4      = results_LR[metric].mean()
+    std4    = results_LR[metric].std()
+    print(f'{metric} for LR is: {round(r4*100, 2)}+- {round(std4*100, 2)}')
+#%% Applying Randomized grid search to find the best config. of RF
+
 BestParams_RandomSearch, Bestsocre_RandomSearch ,means, stds, params= Object.RandomSearchRF(X, y,
                         estimator = RandomForestClassifier(), scoring = scoring,
                         n_estimators = [int(x) for x in np.arange(10, 500, 20)],
@@ -569,13 +742,40 @@ BestParams_RandomSearch, Bestsocre_RandomSearch ,means, stds, params= Object.Ran
                         min_samples_leaf = [1, 2, 4],
                         bootstrap = [True, False],
                         n_iter = 100, cv = 10)
-# Combining some REM and SWS epochs
-Object.CombineEpochs(directory = 'P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/',
-              ch = 'fp2-M1', N3_fname  = 'tr90_N3_fp1-M2_fp2-M1',
-              REM_fname = 'tr90_fp1-M2_fp2-M1',
-              saving = False, fname_save = 'tst')
 
-# How to save some results?
+#%% Test feature selection methods ##
+# PCA
+PCA_out                            = Object.FeatSelect_PCA(X, y, n_components = 5)
+# Boruta
+ranks_Boruta, Feat_selected_Boruta = Object.FeatSelect_Boruta(X, y, max_depth = 7)
+# Lasso
+Feat_selected_lasso                = Object.FeatSelect_LASSO(X, y, C = 1)
+#ANOVA
+Feat_selected_ANOVA                = Object.FeatSelect_ANOVA(X,y, k = 80)
+#Recruisive
+ranks_rec, Feat_selected_rec       = Object.FeatSelect_Recrusive(X, y, k = 20)
+#### NOW TEST CLASSIFIERS WITH SELECTED FEATS
+results_RF  = Object.RandomForest_Modelling(Feat_selected_Boruta, y, scoring = scoring, n_estimators = 200, cv = 10)
+
+
+#%% Example save featureset
+path = 'P:/3013080.02/ml_project/scripts/1D_TimeSeries/features/'
+Object.SaveFeatureSet(X, y, path = path, filename = 'feat42_N3')
+
+#%% Example load features:
+X, y= Object.LoadFeatureSet(path = 'P:/3013080.02/ml_project/scripts/1D_TimeSeries/features/',
+                            fname = 'feat42_N3_fp2-M1', 
+                            feats = 'featureset', 
+                            labels = 'labels')
+
+#%% Combining some REM and SWS epochs
+
+Object.CombineEpochs(directory = 'P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/',
+              ch = 'fp1-M2', N3_fname  = 'tr90_N3_fp1-M2_fp2-M1',
+              REM_fname = 'tr90_fp1-M2_fp2-M1',
+              saving = True, fname_save = 'tr90_N3&REM_fp1-M2')
+
+#%% How to save some results?
 directory = 'P:/3013080.02/ml_project/scripts/1D_TimeSeries/results/' 
 fname = '42feats_N3'
 with h5py.File((directory+fname + '.h5'), 'w') as wf:
