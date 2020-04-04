@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Created on 29/03/2020 
-@author: Mahdad 
+Created on 29/03/2020  
+@author: Mahdad
 
 THIS IS THE CLASS FOR "MACHINE LEARNING & DEPRESSION PROJECT."
 The class is capable of extracting relevant features, applying various machine-
