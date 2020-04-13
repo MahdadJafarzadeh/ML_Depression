@@ -1,15 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-Created on 29/03/2020  
+Created on 29/03/2020 
 @author: Mahdad
 
 THIS IS THE CLASS FOR "MACHINE LEARNING & DEPRESSION PROJECT."
+ML_Deperession class is made to classify Normal EEG epochs from the ones from
+depressed people. Using this code, one can use channels of interest and sleep
+stges of interest to perform classification.
 The class is capable of extracting relevant features, applying various machine-
 learning algorithms and finally applying Randomized grid search to tune hyper-
 parameters of different classifiers.
 
-After each method of the class, there is a short description, introducing the 
-relevant input/outputs.
+To see the example codes and instructions how to use each method of class, 
+please visit: https://github.com/MahdadJafarzadeh/ML_Depression/
+
+to import the class, use:
+from ML_Depression import ML_Depression
 
 """
 #%% Importing libs
@@ -370,8 +376,8 @@ class ML_Depression():
         Feat_test = sc.transform(Feat_test)
         
         #%% Shuffle train and test data with rand perumtation
-        rp_train = np.random.permutation(len(Feat_train))
-        rp_test = np.random.permutation(len(Feat_test))
+        rp_train = np.random.RandomState(seed=42).permutation(len(Feat_train))
+        rp_test  = np.random.RandomState(seed=42).permutation(len(Feat_test))
         
         Feat_train_rp = Feat_train[rp_train,:]
         Feat_test_rp  = Feat_test[rp_test,:]
@@ -670,13 +676,13 @@ class ML_Depression():
                     dset = wf.create_dataset('y' , y.shape, data  = y)
                     
             return X, y
+
                 
 #%% Test Section: Choose the file of interest
-fname = ("P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/tr90_N3_fp1-M2_fp2-M1.h5") # N3
-#fname = ("P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/tr90_fp1-M2_fp2-M1.h5")   # REM
-#fname = ("P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/tr90_N3&REM_fp2-M1.h5") # N3 & REM --> Fp2-M1
-#fname = ("P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/tr90_N3&REM_fp1-M2.h5") # N3 & REM --> Fp1-M2
-ch = 'fp2-M1'
+'''
+#fname = ("P:/3013080.02/ml_project/scripts/1D_TimeSeries/train_test/tr90_N2_fp1-M2_fp2-M1.h5") # N1
+fname = ("D:/1D_TimeSeries/raw_EEG/without artefact/train_test/tr90_N3_C3-M2_C4-M1.h5") #REM --> Fp1-M2
+ch = 'C4-M1'
 # Defining the object of ML_Depression class
 Object = ML_Depression(fname, ch, fs = 200, T = 30)
 # Extract features
@@ -799,3 +805,112 @@ with h5py.File((directory+fname + '.h5'), 'w') as wf:
                 dset = wf.create_dataset('f1_LR' , results_LR['test_f1_score'].shape, data  = results_LR['test_f1_score'])
                 dset = wf.create_dataset('f1_RF' , results_RF['test_f1_score'].shape, data  = results_RF['test_f1_score'])
                 dset = wf.create_dataset('f1_xgb', results_xgb['test_f1_score'].shape, data = results_xgb['test_f1_score'])
+
+#%% Extracting features from more than one channel:
+tic = time.time()                
+                ########### Central electrodes #############
+main_path = "D:/1D_TimeSeries/raw_EEG/without artefact/train_test/"
+save_path = 'P:/3013080.02/ml_project/scripts/1D_TimeSeries/features/'
+
+fname_C_N3  = (main_path+"tr90_N3_C3-M2_C4-M1.h5")
+fname_C_REM = (main_path+"tr90_REM_C3-M2_C4-M1.h5")
+ch_C4 = 'C4-M1'
+ch_C3 = 'C3-M2'
+
+Object_C3_REM = ML_Depression(filename=fname_C_REM, channel = ch_C3, fs = 200, T = 30)
+X_C3_REM,y_C3_REM            = Object_C3_REM.FeatureExtraction() 
+Object_C3_REM.SaveFeatureSet(X = X_C3_REM, y=y_C3_REM, path = save_path, filename = 'feat42_C3_REM')
+            
+Object_C4_REM = ML_Depression(filename=fname_C_REM, channel = ch_C4, fs = 200, T = 30)
+X_C4_REM,y_C4_REM            = Object_C4_REM.FeatureExtraction()        
+Object_C4_REM.SaveFeatureSet(X = X_C4_REM, y=y_C4_REM, path = save_path, filename = 'feat42_C4_REM')
+
+Object_C3_N3  = ML_Depression(filename=fname_C_N3, channel = ch_C3, fs = 200, T = 30)
+X_C3_N3,y_C3_N3            = Object_C3_N3.FeatureExtraction()      
+Object_C3_N3.SaveFeatureSet(X = X_C3_N3, y=y_C3_N3, path = save_path, filename = 'feat42_C3_N3')
+
+Object_C4_N3 = ML_Depression(filename=fname_C_N3, channel = ch_C4, fs = 200, T = 30)
+X_C4_N3,y_C4_N3            = Object_C4_N3.FeatureExtraction()     
+Object_C4_N3.SaveFeatureSet(X = X_C4_N3, y=y_C4_N3, path = save_path, filename = 'feat42_C4_N3')
+
+
+                ########### Occipital electrodes #############
+main_path = "D:/1D_TimeSeries/raw_EEG/without artefact/train_test/"
+fname_O_N3  = (main_path+"tr90_N3_O1-M2_O2-M1.h5")
+fname_O_REM = (main_path+"tr90_REM_O1-M2_O2-M1.h5")
+ch_O2 = 'O2-M1'
+ch_O1 = 'O1-M2'
+Object_O1_REM = ML_Depression(filename=fname_O_REM, channel = ch_O1, fs = 200, T = 30)
+X_O1_REM,y_O1_REM            = Object_O1_REM.FeatureExtraction() 
+Object_O1_REM.SaveFeatureSet(X = X_O1_REM, y=y_O1_REM, path = save_path, filename = 'feat42_O1_REM')
+              
+Object_O2_REM = ML_Depression(filename=fname_O_REM, channel = ch_O2, fs = 200, T = 30)
+X_O2_REM,y_O2_REM            = Object_O2_REM.FeatureExtraction()        
+Object_O2_REM.SaveFeatureSet(X = X_O2_REM, y=y_O2_REM, path = save_path, filename = 'feat42_O2_REM')
+
+Object_O1_N3  = ML_Depression(filename=fname_O_N3, channel = ch_O1, fs = 200, T = 30)
+X_O1_N3,y_O1_N3            = Object_O1_N3.FeatureExtraction()      
+Object_O1_N3.SaveFeatureSet(X = X_O1_N3, y=y_O1_N3, path = save_path, filename = 'feat42_O1_N3')
+
+Object_O2_N3 = ML_Depression(filename=fname_O_N3, channel = ch_O2, fs = 200, T = 30)
+X_O2_N3,y_O2_N3            = Object_O2_N3.FeatureExtraction()       
+Object_O2_N3.SaveFeatureSet(X = X_O2_N3, y=y_O2_N3, path = save_path, filename = 'feat42_O2_N3')
+
+                ########### Fp electrodes #############
+main_path = "D:/1D_TimeSeries/raw_EEG/without artefact/train_test/"
+fname_fp_N3  = (main_path+"tr90_N3_fp1-M2_fp2-M1.h5")
+fname_fp_REM = (main_path+"tr90_REM_fp1-M2_fp2-M1.h5")
+ch_fp2 = 'fp2-M1'
+ch_fp1 = 'fp1-M2'
+Object_fp1_REM = ML_Depression(filename=fname_fp_REM, channel = ch_fp1, fs = 200, T = 30)
+X_fp1_REM,y_fp1_REM            = Object_fp1_REM.FeatureExtraction() 
+Object_fp1_REM.SaveFeatureSet(X = X_fp1_REM, y=y_fp1_REM, path = save_path, filename = 'feat42_fp1_REM')
+              
+Object_fp2_REM = ML_Depression(filename=fname_fp_REM, channel = ch_fp2, fs = 200, T = 30)
+X_fp2_REM,y_fp2_REM            = Object_fp2_REM.FeatureExtraction()        
+Object_fp2_REM.SaveFeatureSet(X = X_fp2_REM, y=y_fp2_REM, path = save_path, filename = 'feat42_fp2_REM')
+
+Object_fp1_N3  = ML_Depression(filename=fname_fp_N3, channel = ch_fp1, fs = 200, T = 30)
+X_fp1_N3,y_fp1_N3            = Object_fp1_N3.FeatureExtraction()      
+Object_fp1_N3.SaveFeatureSet(X = X_fp1_N3, y=y_fp1_N3, path = save_path, filename = 'feat42_fp1_N3')
+
+Object_fp2_N3 = ML_Depression(filename=fname_fp_N3, channel = ch_fp2, fs = 200, T = 30)
+X_fp2_N3,y_fp2_N3            = Object_fp2_N3.FeatureExtraction()     
+Object_fp2_N3.SaveFeatureSet(X = X_fp2_N3, y=y_fp2_N3, path = save_path, filename = 'feat42_fp2_N3')
+toc = time.time()
+print(f'time taken: {toc - tic}')
+########## Concatenate all features #########
+# RIGHT hemisphere - REM
+X_rh_REM = np.column_stack((X_fp2_REM,X_C4_REM))
+X_rh_REM = np.column_stack((X_rh_REM,X_O2_REM))
+# RIGHT hemisphere - N3
+X_rh_N3 = np.column_stack((X_fp2_N3,X_C4_N3))
+X_rh_N3 = np.column_stack((X_rh_N3,X_O2_N3))
+# LEFT hemisphere - REM
+X_lh_REM = np.column_stack((X_fp1_REM,X_C3_REM))
+X_lh_REM = np.column_stack((X_lh_REM,X_O1_REM))
+# LEFT hemisphere - N3
+X_lh_N3 = np.column_stack((X_fp1_N3,X_C3_N3))
+X_lh_N3 = np.column_stack((X_lh_N3,X_O1_N3))
+
+# Both sides - REM
+X_REM = np.column_stack((X_rh_REM, X_lh_REM))
+# Both sides - N3
+X_N3 = np.column_stack((X_rh_N3, X_lh_N3))
+# Combine SWS and REM
+X_SWS_REM = np.row_stack((X_N3, X_REM))
+y_SWS_REM = np.concatenate((y_fp2_N3, y_fp2_REM))
+# SAVE ALL COMBINATIONS
+Object = ML_Depression(filename='', channel='', fs = 200, T = 30)
+# one hemisphere
+Object.SaveFeatureSet(X = X_rh_REM, y=y_fp2_REM, path = save_path, filename = 'feat42_rh_REM')
+Object.SaveFeatureSet(X = X_lh_REM, y=y_fp2_REM, path = save_path, filename = 'feat42_lh_REM')
+Object.SaveFeatureSet(X = X_rh_N3 , y=y_fp2_N3 , path = save_path, filename = 'feat42_rh_N3')
+Object.SaveFeatureSet(X = X_lh_N3 , y=y_fp2_N3 , path = save_path, filename = 'feat42_lh_N3')
+# Both hemisphere
+Object.SaveFeatureSet(X = X_N3 , y=y_fp2_N3 , path = save_path, filename = 'feat42_l&rh_N3')
+Object.SaveFeatureSet(X = X_REM , y=y_fp2_N3 , path = save_path, filename = 'feat42_l&rh_REM')
+# Both hemispheres- SWS &REM combination
+Object.SaveFeatureSet(X = X_SWS_REM , y=y_SWS_REM , path = save_path, filename = 'feat42_l&rh_N3&REM')
+
+''' 
