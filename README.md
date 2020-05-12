@@ -1,7 +1,9 @@
 # ML_Depression
 
 This is the project folder for ML_Depression project, where we aimed at classifitying Normal vs. depressed groups using EEG specific sleep stages (SWS and REM, in particular). Using this code, one can use channels of interest and sleep
-stges of interest to perform classification. This class comprises feature extraction method, feature selection methods, various machine-learning classifiers, and grid/randomized search methods to tune hyper parametrs. The descriptions can be found below. To sue the class please read this page thoroughly.
+stges of interest to perform classification. 
+
+This class comprises feature extraction method, feature selection methods, various machine-learning classifiers, and grid/randomized search methods to tune hyper-parametrs. The descriptions can be found below. To use the class please read this page thoroughly.
 
     INPUTS: 
         1) filename : full directory of train-test split (e.g. .h5 file saved via Prepare_for_CNN.py)
